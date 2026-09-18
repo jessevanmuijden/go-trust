@@ -691,6 +691,11 @@ func TestNormalizeSubjectID(t *testing.T) {
 		{"x509_san_dns:sub.example.com", "https://sub.example.com"},
 		{"plain-id", "plain-id"},
 		{"did:web:example.com", "did:web:example.com"},
+		// OpenID4VP 1.0 carries the DID scheme as a client_id prefix. Left on,
+		// it reaches the did:web registry as "decentralized_identifier:did:web:..."
+		// which is not a DID, and the DID is never resolved.
+		{"decentralized_identifier:did:web:example.com", "did:web:example.com"},
+		{"decentralized_identifier:did:jwk:eyJrdHkiOiJFQyJ9", "did:jwk:eyJrdHkiOiJFQyJ9"},
 		{"", ""},
 	}
 	for _, tt := range tests {
