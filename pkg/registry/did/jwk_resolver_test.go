@@ -326,3 +326,35 @@ func TestVerifyKeyBinding_RejectsUnusableKeyMaterial(t *testing.T) {
 	require.False(t, resp.Decision)
 	assert.Contains(t, resp.Context.Reason["error"], "must be a JWK object or a key identifier")
 }
+
+// A DID document may embed a verification method belonging to another
+// controller. A relative reference such as "#0" resolves against the
+// document's own DID, so it must not bind a foreign method that merely
+// happens to share the fragment.
+func TestFindVerificationMethodByKid_FragmentIsScopedToTheDocument(t *testing.T) {
+	doc := &DIDDocument{
+		ID: "did:example:subject",
+		VerificationMethod: []VerificationMethod{
+			{ID: "did:other:controller#0", Type: "JsonWebKey2020", Controller: "did:other:controller"},
+			{ID: "did:example:subject#keys-1", Type: "JsonWebKey2020", Controller: "did:example:subject"},
+		},
+	}
+
+	assert.Nil(t, findVerificationMethodByKid(doc, "#0"),
+		"#0 must resolve against did:example:subject, not bind did:other:controller#0")
+
+	vm := findVerificationMethodByKid(doc, "#keys-1")
+	require.NotNil(t, vm, "a fragment naming this document's own method should bind")
+	assert.Equal(t, "did:example:subject#keys-1", vm.ID)
+
+	// An absolute identifier still binds whatever the document declares,
+	// including a foreign one: the signer named it in full rather than
+	// relying on resolution against the subject.
+	vm = findVerificationMethodByKid(doc, "did:other:controller#0")
+	require.NotNil(t, vm)
+	assert.Equal(t, "did:other:controller#0", vm.ID)
+
+	// The bare-DID shorthand needs an unambiguous document, and this one
+	// declares two methods.
+	assert.Nil(t, findVerificationMethodByKid(doc, "did:example:subject"))
+}

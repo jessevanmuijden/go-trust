@@ -339,7 +339,9 @@ func didDocServicesMatch(service interface{}, requiredTypes []string) bool {
 
 // SupportedResourceTypes returns the resource types this registry can handle.
 func (r *GenericDIDRegistry) SupportedResourceTypes() []string {
-	return []string{"jwk"}
+	// "kid" accompanies a key identifier rather than key material, which is
+	// how a DID-based client_id names the method that signed a request.
+	return []string{"jwk", "kid"}
 }
 
 // SupportsResolutionOnly returns true as DID resolution supports resolution-only requests.
@@ -501,9 +503,13 @@ func findVerificationMethodByKid(didDoc *DIDDocument, kid string) *VerificationM
 	}
 
 	if strings.HasPrefix(kid, "#") {
+		// A relative reference resolves against the document's own DID. It is
+		// resolved and compared whole rather than matched as a suffix: a
+		// document may embed a method belonging to another controller, and
+		// "#0" must not bind did:other:xyz#0 just because the fragments agree.
+		absolute := didDoc.ID + kid
 		for i := range didDoc.VerificationMethod {
-			if idx := strings.Index(didDoc.VerificationMethod[i].ID, "#"); idx >= 0 &&
-				didDoc.VerificationMethod[i].ID[idx:] == kid {
+			if didDoc.VerificationMethod[i].ID == absolute {
 				return &didDoc.VerificationMethod[i]
 			}
 		}
